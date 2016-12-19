@@ -46,8 +46,7 @@ encrypt () {
 
 iv=`openssl enc -aes-128-cbc -k dummy -P -md sha1 | grep iv | cut -d "=" -f 2`
 
-salt=XhUO20afija
-#salt=1789F0B8C4A051E5
+salt=1789F0B8C4A051E5
 
 encryption_key=`generate_key "${p}"`
 
