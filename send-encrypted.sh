@@ -1,14 +1,17 @@
 #!/bin/sh
 
-usage() { echo "Usage: $0 [-k <simplepush_key>] [-p <password>] [-e <event>] [-t <title>] [-m <message>]" 1>&2; exit 0; }
+usage() { echo "Usage: $0 [-k <simplepush_key>] [-p <password>] [-s <salt>] [-e <event>] [-t <title>] [-m <message>]" 1>&2; exit 0; }
 
-while getopts ":k:p:e:t:m:" o; do
+while getopts ":k:p:s:e:t:m:" o; do
 	case "${o}" in
 		k)
 			k=${OPTARG}
 			;;
 		p)
 			p=${OPTARG}
+			;;
+		s)
+			s=${OPTARG}
 			;;
 		e)
 			e=${OPTARG}
@@ -33,7 +36,11 @@ fi
 
 generate_key () {
     # First argument is password
-    echo -n "${1}${salt}" | sha1sum | awk '{print toupper($1)}' | cut -c1-32
+	if [ -z "${s}" ]; then
+    	echo -n "${1}${salt}" | sha1sum | awk '{print toupper($1)}' | cut -c1-32
+	else
+    	echo -n "${1}${s}" | sha1sum | awk '{print toupper($1)}' | cut -c1-32
+	fi
 }
 
 encrypt () {
