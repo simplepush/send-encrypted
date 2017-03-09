@@ -1,6 +1,6 @@
 #!/bin/sh
 
-usage() { echo "Usage: $0 [-k <simplepush_key>] [-p <password>] [-s <salt>] [-e <event>] [-t <title>] [-m <message>]" 1>&2; exit 0; }
+usage() { echo "Usage: $0 -k <simplepush_key> -p <password> [-s <salt>] [-e <event>] [-t <title>] -m <message>" 1>&2; exit 0; }
 
 while getopts ":k:p:s:e:t:m:" o; do
 	case "${o}" in
