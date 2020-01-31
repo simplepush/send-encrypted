@@ -68,12 +68,13 @@ parse_options() {
 	key=$SIMPLEPUSH_KEY
 	password=$SIMPLEPUSH_PASSWORD
 	salt=${SIMPLEPUSH_SALT:-1789F0B8C4A051E5}
+	message_opt=false
 
 	while getopts :e:k:m:p:s:t:h opt; do
 		case $opt in
 			e) event=$OPTARG ;;
 			k) key=$OPTARG ;;
-			m) message=$OPTARG ;;
+			m) message=$OPTARG; message_opt=true ;;
 			p) password=$OPTARG ;;
 			s) salt=$OPTARG ;;
 			t) title=$OPTARG ;;
@@ -87,6 +88,10 @@ parse_options() {
 	shift $((OPTIND-1))
 	[ $# -gt 0 ] &&
 		usage "unrecognized option '$1'"
+
+	# Read message from stdin if it's not a terminal
+	! $message_opt && ! [ -t 0 ] &&
+		message=$(cat -)
 
 	unset opt
 	[ -z "$key"     ] && opt=k
