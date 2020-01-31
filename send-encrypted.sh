@@ -1,75 +1,121 @@
 #!/bin/sh
+#
+# Push notifications using Simplepush
+#
+# Environment variables:
+#  SIMPLEPUSH_KEY SIMPLEPUSH_PASSWORD SIMPLEPUSH_SALT
 
-usage() { echo "Usage: $0 -k <simplepush_key> -p <password> [-s <salt>] [-e <event>] [-t <title>] -m <message>" 1>&2; exit 0; }
+api_url=https://api.simplepush.io/send
 
-while getopts ":k:p:s:e:t:m:" o; do
-	case "${o}" in
-		k)
-			k=${OPTARG}
-			;;
-		p)
-			p=${OPTARG}
-			;;
-		s)
-			s=${OPTARG}
-			;;
-		e)
-			e=${OPTARG}
-			;;
-		t)
-			t=${OPTARG}
-			;;
-		m)
-			m=${OPTARG}
-			;;
-		*)
-			usage
-			;;
-	esac
-done
-shift $((OPTIND-1))
+main() {
+	set -ef
+	parse_options "$@" || :
 
-if [ -z "${k}" ] || [ -z "${p}" ] || [ -z "${m}" ]; then
-  usage
-	return 1
-fi
-
-generate_key () {
-    # First argument is password
-	if [ -z "${s}" ]; then
-    	echo -n "${1}${salt}" | sha1sum | awk '{print toupper($1)}' | cut -c1-32
-	else
-    	echo -n "${1}${s}" | sha1sum | awk '{print toupper($1)}' | cut -c1-32
-	fi
+	# Encrypt the data only when password is set
+	[ -n "$password" ] && {
+		iv=$(generate_iv)
+		encryption_key=$(generate_key "$password" "$salt")
+		message=$(encrypt "$encryption_key" "$iv" "$message")
+		title=$(encrypt "$encryption_key" "$iv" "$title")
+		encrypted=true
+	} ||
+		encrypted=false
+		
+	# Set curl options
+	set -- \
+		--silent \
+		--data-urlencode "key=$key" \
+		--data-urlencode "msg=$message" \
+	
+	$encrypted &&
+		set -- "$@" \
+			--data-urlencode "encrypted=true" \
+			--data-urlencode "iv=$iv"
+	
+	[ -n "$title" ] &&
+		set -- "$@" --data-urlencode "title=$title"
+	
+	[ -n "$event" ] &&
+		set -- "$@" --data-urlencode "event=$event"
+	
+	curl "$@" "$api_url"
 }
 
-encrypt () {
-    # First argument is key
-    # Second argument is IV
-    # Third argument is data
+usage() {
+	prog_name=${0##*/}
+	help_text="Usage: $prog_name [options...]
 
-    echo -n "${3}" | openssl aes-128-cbc -base64 -K "${1}" -iv "${2}" | awk '{print}' ORS='' | tr '+' '-' | tr '/' '_'
+Push notifications using Simplepush
+
+	-e <event>    Event name
+	-k <key>      Simplepush key
+	-p <pass>     Encryption password
+	-s <salt>     Encryption salt
+	-t <title>    Title of the push message
+	-m <message>  Message to push
+	-h	      Display this help text and exit"
+
+	[ $# -gt 0 ] && {
+		exec >&2
+		printf '%s: %s\n\n' "$prog_name" "$*"
+	}
+	printf %s\\n "$help_text"
+	exit ${1:+1}
 }
 
-iv=`openssl enc -aes-128-cbc -k dummy -P -md sha1 | grep iv | cut -d "=" -f 2`
+parse_options() {
+	help=false
+	key=$SIMPLEPUSH_KEY
+	password=$SIMPLEPUSH_PASSWORD
+	salt=${SIMPLEPUSH_SALT:-1789F0B8C4A051E5}
 
-salt=1789F0B8C4A051E5
+	while getopts :e:k:m:p:s:t:h opt; do
+		case $opt in
+			e) event=$OPTARG ;;
+			k) key=$OPTARG ;;
+			m) message=$OPTARG ;;
+			p) password=$OPTARG ;;
+			s) salt=$OPTARG ;;
+			t) title=$OPTARG ;;
+			h) help=true ;;
+			:) usage \
+				"option '$OPTARG' requires a parameter" ;;
+			\?) usage \
+				"unrecognized option '$OPTARG'" ;;
+		esac
+	done
+	shift $((OPTIND-1))
+	[ $# -gt 0 ] &&
+		usage "unrecognized option '$1'"
 
-encryption_key=`generate_key "${p}"`
+	unset opt
+	[ -z "$key"     ] && opt=k
+	[ -z "$message" ] && opt=m
+	[ -n "$opt"     ] &&
+		usage "missing or empty mandatory option '$opt'"
 
-if [ -n "${t}" ]; then
-    title_encrypted=`encrypt "${encryption_key}" "${iv}" "${t}"`
-	  title="&title=${title_encrypted}"
-else
-	  title=""
-fi
+	$help && usage
+}
 
-if [ -n "${e}" ]; then
-	  event="&event=${e}"
-else
-	  event=""
-fi
+generate_iv() {
+	openssl enc -aes-128-cbc -k dummy -P -md sha1 |
+		sed -n '/^iv/ s/.*=//p'
+}
+generate_key() {
+	_password=$1
+	_salt=$2
+	printf %s%s "$_password" "$_salt" \
+		| sha1sum \
+		| awk '{ print toupper(substr($1, 1, 32)) }'
+}
 
-message=`encrypt "${encryption_key}" "${iv}" "${m}"`
+encrypt() {
+	_key=$1
+	_iv=$2
+	_data=$3
+	printf %s "$_data" |
+	    	openssl aes-128-cbc -base64 -K "$_key" -iv "$_iv" |
+	    	tr +/ -_ | tr -d \\n
+}
 
-curl --data "key=${k}${title}&msg=${message}${event}&encrypted=true&iv=$iv" "https://api.simplepush.io/send" > /dev/null 2>&1
+main "$@"
