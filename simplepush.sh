@@ -17,9 +17,9 @@ main() {
 		encryption_key=$(generate_key "$password" "$salt")
 		message=$(encrypt "$encryption_key" "$iv" "$message")
 		title=$(encrypt "$encryption_key" "$iv" "$title")
-		encrypted=true
+		is_encrypted=true
 	} ||
-		encrypted=false
+		is_encrypted=false
 		
 	# Set curl options
 	set -- \
@@ -27,7 +27,7 @@ main() {
 		--data-urlencode "key=$key" \
 		--data-urlencode "msg=$message" \
 	
-	$encrypted &&
+	$is_encrypted &&
 		set -- "$@" \
 			--data-urlencode "encrypted=true" \
 			--data-urlencode "iv=$iv"
@@ -42,6 +42,7 @@ main() {
 }
 
 usage() {
+	error_message=$*
 	prog_name=${0##*/}
 	help_text="Usage: $prog_name [options...]
 
@@ -57,10 +58,10 @@ Push notifications using Simplepush
 
 	[ $# -gt 0 ] && {
 		exec >&2
-		printf '%s: %s\n\n' "$prog_name" "$*"
+		printf '%s: %s\n\n' "$prog_name" "$error_message"
 	}
 	printf %s\\n "$help_text"
-	exit ${1:+1}
+	exit ${error_message:+1}
 }
 
 parse_options() {
@@ -68,13 +69,13 @@ parse_options() {
 	key=$SIMPLEPUSH_KEY
 	password=$SIMPLEPUSH_PASSWORD
 	salt=${SIMPLEPUSH_SALT:-1789F0B8C4A051E5}
-	message_opt=false
+	has_message=false
 
 	while getopts :e:k:m:p:s:t:h opt; do
 		case $opt in
 			e) event=$OPTARG ;;
 			k) key=$OPTARG ;;
-			m) message=$OPTARG; message_opt=true ;;
+			m) message=$OPTARG; has_message=true ;;
 			p) password=$OPTARG ;;
 			s) salt=$OPTARG ;;
 			t) title=$OPTARG ;;
@@ -90,7 +91,7 @@ parse_options() {
 		usage "unrecognized option '$1'"
 
 	# Read message from stdin if it's not a terminal
-	! $message_opt && ! [ -t 0 ] &&
+	! $has_message && ! [ -t 0 ] &&
 		message=$(cat -)
 
 	unset opt
