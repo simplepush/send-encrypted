@@ -107,6 +107,7 @@ generate_iv() {
 	openssl enc -aes-128-cbc -k dummy -P -md sha1 |
 		sed -n '/^iv/ s/.*=//p'
 }
+
 generate_key() {
 	_password=$1
 	_salt=$2
