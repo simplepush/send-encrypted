@@ -16,7 +16,8 @@ main() {
 		iv=$(generate_iv)
 		encryption_key=$(generate_key "$password" "$salt")
 		message=$(encrypt "$encryption_key" "$iv" "$message")
-		title=$(encrypt "$encryption_key" "$iv" "$title")
+		[ -n "$title" ] &&
+			title=$(encrypt "$encryption_key" "$iv" "$title")
 		is_encrypted=true
 	} ||
 		is_encrypted=false
