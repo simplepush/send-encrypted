@@ -105,7 +105,7 @@ parse_options() {
 }
 
 generate_iv() {
-	openssl enc -aes-128-cbc -k dummy -P -md sha1 |
+	openssl enc -aes-128-cbc -pbkdf2 -iter 1000 -k dummy -P -md sha1 |
 		sed -n '/^iv/ s/.*=//p'
 }
 
@@ -122,7 +122,7 @@ encrypt() {
 	_iv=$2
 	_data=$3
 	printf %s "$_data" |
-	    	openssl aes-128-cbc -base64 -K "$_key" -iv "$_iv" |
+	    	openssl aes-128-cbc -pbkdf2 -iter 1000 -base64 -K "$_key" -iv "$_iv" |
 	    	tr +/ -_ | tr -d \\n
 }
 
